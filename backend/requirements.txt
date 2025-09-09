@@ -4,3 +4,10 @@ python-multipart
 python-dotenv
 pymongo>=4.0
 supabase
+celery
+PyMuPDF
+pytest
+requests
+mongomock
+mock
+redis

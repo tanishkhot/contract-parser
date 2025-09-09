@@ -1,11 +1,15 @@
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import StreamingResponse
+import io
 import uuid
 import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from supabase import create_client, Client # Import the Supabase client
 from datetime import datetime
+
+from celery_worker import process_contract
 
 # Load environment variables from .env file
 load_dotenv()
@@ -65,4 +69,66 @@ async def upload_contract(file: UploadFile = File(...)):
         supabase.storage.from_(BUCKET_NAME).remove([object_path])
         raise HTTPException(status_code=500, detail=f"Failed to store contract metadata in MongoDB: {e}")
     
-    return {"contract_id": contract_id, "message": "Contract uploaded and stored in Supabase"}
+    # Trigger the background processing task
+    process_contract.delay(contract_id)
+
+    return {"contract_id": contract_id, "message": "Contract uploaded and queued for processing"}
+
+@app.get("/contracts")
+async def get_contracts():
+    try:
+        # Retrieve all contracts from the collection
+        all_contracts = list(contracts_collection.find({}, {"_id": 1, "filename": 1, "status": 1, "upload_time": 1}))
+        
+        # Convert ObjectId to string for JSON serialization
+        for contract in all_contracts:
+            contract["_id"] = str(contract["_id"])
+            
+        return all_contracts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve contracts from MongoDB: {e}")
+
+@app.get("/contracts/{contract_id}/status")
+async def get_contract_status(contract_id: str):
+    try:
+        contract = contracts_collection.find_one({"_id": contract_id}, {"status": 1})
+        if contract:
+            return {"status": contract.get("status")}
+        else:
+            raise HTTPException(status_code=404, detail="Contract not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve contract status: {e}")
+
+@app.get("/contracts/{contract_id}")
+async def get_contract_data(contract_id: str):
+    try:
+        contract = contracts_collection.find_one({"_id": contract_id})
+        if contract:
+            # TODO: Add data extraction logic here
+            # For now, just return the stored data
+            contract["_id"] = str(contract["_id"])
+            return contract
+        else:
+            raise HTTPException(status_code=404, detail="Contract not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve contract data: {e}")
+
+@app.get("/contracts/{contract_id}/download")
+async def download_contract(contract_id: str):
+    try:
+        # 1. Retrieve contract metadata from MongoDB
+        contract = contracts_collection.find_one({"_id": contract_id})
+        if not contract:
+            raise HTTPException(status_code=404, detail="Contract not found")
+
+        supabase_path = contract.get("supabase_path")
+        if not supabase_path:
+            raise HTTPException(status_code=404, detail="File path not found for this contract")
+
+        # 2. Download the file from Supabase Storage
+        response = supabase.storage.from_(BUCKET_NAME).download(supabase_path)
+        
+        # 3. Return the file as a streaming response
+        return StreamingResponse(io.BytesIO(response), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={contract.get('filename')}"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download contract: {e}")
