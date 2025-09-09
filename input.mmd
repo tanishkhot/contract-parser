@@ -1,0 +1,46 @@
+graph TD
+    %% Define styles for different component types
+    classDef service fill:#d6eaff,stroke:#36f,stroke-width:2px;
+    classDef datastore fill:#d5f5e3,stroke:#28a745,stroke-width:2px;
+    classDef queue fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
+    classDef external fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
+
+    %% Main Architecture
+    subgraph User Layer
+        User["fa:fa-user User's Browser"]
+    end
+
+    subgraph API Layer
+        Frontend["fa:fa-react React/Next.js Frontend"]
+        Backend["fa:fa-server Python FastAPI Backend"]
+    end
+
+    subgraph Async Processing Layer
+        Worker["fa:fa-cogs Celery Worker"]
+        LLM["fa:fa-brain LLM Service"]:::external
+    end
+
+    subgraph Data & Storage
+        FileStorage["fa:fa-folder-open File Storage (Volume)"]:::datastore
+        TaskQueue[("fa:fa-tasks Task Queue (Redis)")]:::queue
+        Database[("fa:fa-database Database (MongoDB)")]:::datastore
+    end
+
+    %% User Request Flow (Upload)
+    User --> Frontend
+    Frontend -- "1. POST /upload" --> Backend
+    Backend -- "2. Save PDF" --> FileStorage
+    Backend -- "3. Create Record (pending)" --> Database
+    Backend -- "4. Enqueue Task" --> TaskQueue
+    Backend -- "5. Return contract_id" --> Frontend
+
+    %% Asynchronous Worker Flow
+    TaskQueue -- "6. Dequeue Task" --> Worker
+    Worker -- "7. Fetch PDF" --> FileStorage
+    Worker -- "8. Update Status (processing)" --> Database
+    Worker -- "9. Extract Data" --> LLM
+    LLM -- "10. Return Structured JSON" --> Worker
+    Worker -- "11. Calculate Score & Update (completed)" --> Database
+
+    %% Assign classes to nodes for styling
+    class Frontend,Backend,Worker service;
