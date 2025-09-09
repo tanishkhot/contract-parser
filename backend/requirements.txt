@@ -11,3 +11,4 @@ requests
 mongomock
 mock
 redis
+groq

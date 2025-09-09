@@ -15,7 +15,7 @@ services:
 
   worker:
     build: ./backend
-    command: ["celery", "-A", "main.celery", "worker", "--loglevel=info"]
+    command: ["celery", "-A", "celery_worker", "worker", "--loglevel=info"]
     volumes:
       - ./backend:/app
     env_file:
@@ -24,8 +24,15 @@ services:
       - mongo
       - redis
 
+  frontend: # New frontend service
+    build: ./frontend
+    ports:
+      - "3000:80" # Map host port 3000 to container port 80 (Nginx default)
+    depends_on:
+      - backend # Frontend depends on backend being available
+
   mongo:
-    image: mongo:latest
+    image: mongo:6.0
     ports:
       - "27017:27017"
     volumes:
