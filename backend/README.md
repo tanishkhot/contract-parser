@@ -43,19 +43,3 @@ To get the entire application stack (FastAPI backend, Celery worker, Redis, Mong
     ```bash
     docker compose down
     ```
-
-## Testing (within Docker)
-
-If you need to run backend unit tests within the Docker environment, you can execute commands inside the running `backend` service container.
-
-1.  **Find the backend service container ID/name:**
-    ```bash
-    docker ps
-    ```
-    Look for the container running the `backend` service.
-
-2.  **Execute pytest:**
-    ```bash
-    docker exec <backend_container_id_or_name> pytest
-    ```
-    (Replace `<backend_container_id_or_name>` with the actual ID or name of your backend container.)
