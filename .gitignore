@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+backend/text # Added to ignore the file that contained the secret
 
 # Node
 node_modules/
